@@ -30,7 +30,7 @@ public class SecKillService {
 
     private final Logger logger = LogManager.getLogger(SecKillService.class);
 
-    ExecutorService service = Executors.newFixedThreadPool(4);
+    ExecutorService service = Executors.newFixedThreadPool(10);
 
     public SecKillService() {
         httpService = new HttpService();
@@ -69,10 +69,16 @@ public class SecKillService {
             Thread.sleep(startDate - now - 1000);
         }
         //保守型请求
-        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 0, 0));
-        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 10, 0));
-        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate, 200, 50));
-        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate, 500, 0));
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 0, 0, true));
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 10, 0, false));
+
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 50, 0, false));
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 50, 0, false));
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 50, 0, false));
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 50, 0, false));
+
+        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate, 200, 50, false));
+        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate, 500, 0, false));
         service.shutdown();
         //等待线程结束
         try {

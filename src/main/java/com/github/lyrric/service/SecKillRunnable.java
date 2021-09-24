@@ -46,19 +46,25 @@ public class SecKillRunnable implements Runnable {
      */
     private int stRefreshTh;
 
-    public SecKillRunnable(boolean resetSt, HttpService httpService, Integer vaccineId, long startDate, int earlyTime, int stRefreshTh) {
+    private boolean daemon;
+
+    public SecKillRunnable(boolean resetSt, HttpService httpService, Integer vaccineId, long startDate, int earlyTime, int stRefreshTh, boolean daemon) {
         this.resetSt = resetSt;
         this.httpService = httpService;
         this.vaccineId = vaccineId;
         this.startDate = startDate;
         this.earlyTime = earlyTime;
         this.stRefreshTh = stRefreshTh;
+        this.daemon = daemon;
         this.reqCount = 0;
     }
 
     @Override
     public void run() {
         do {
+            if (Config.success != null && Config.success) {
+                return;
+            }
             if (System.currentTimeMillis() + earlyTime < startDate) {
                 try {
                     Thread.sleep(10);
@@ -70,7 +76,7 @@ public class SecKillRunnable implements Runnable {
             long id = Thread.currentThread().getId();
             try {
                 //获取加密参数st
-                if (resetSt || (stRefreshTh > 0 && (reqCount % stRefreshTh) == (stRefreshTh - 1))) {
+                if (resetSt) {
                     logger.info("Thread ID：{}，请求获取加密参数st", id);
                     Config.st = httpService.getSt(vaccineId.toString());
                     logger.info("Thread ID：{}，成功获取加密参数st", id);
@@ -79,14 +85,16 @@ public class SecKillRunnable implements Runnable {
                 httpService.secKill(vaccineId.toString(), "1", Config.memberId.toString(),
                         Config.idCard, Config.st);
                 Config.success = true;
-                logger.info("Thread ID：{}，抢购成功", id);
-                break;
+                for (int i = 0; i < 100; i++) {
+                    logger.error("Thread ID：{}，抢购成功", id);
+                }
+                return;
             } catch (BusinessException e) {
                 logger.info("Thread ID: {}, 抢购失败: {}", id, e.getErrMsg());
-                if (e.getErrMsg().contains("没抢到")) {
-                    Config.success = false;
-                    break;
-                }
+//                if (e.getErrMsg().contains("没抢到")) {
+//                    Config.success = false;
+//                    break;
+//                }
             } catch (ConnectTimeoutException | SocketTimeoutException socketTimeoutException) {
                 logger.error("Thread ID: {},抢购失败: 超时了", Thread.currentThread().getId());
             } catch (Exception e) {
@@ -94,14 +102,14 @@ public class SecKillRunnable implements Runnable {
             } finally {
                 reqCount++;
                 //如果离开始时间2分钟后，或者已经成功抢到则不再继续
-                if (System.currentTimeMillis() > startDate + 1000 * 60 * 2 || Config.success != null) {
+                if (System.currentTimeMillis() > startDate + 1000 * 90) {
                     break;
                 }
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+//                try {
+//                    Thread.sleep(10);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
             }
         } while (true);
     }

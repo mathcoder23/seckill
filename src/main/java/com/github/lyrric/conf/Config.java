@@ -50,11 +50,11 @@ public class Config {
      * 抢购是否成功
      * false表示疫苗已抢光
      */
-    public static Boolean success = null;
+    public volatile static Boolean success = null;
 
     /**
      * 加密参数st
      */
-    public static String st;
+    public volatile static String st;
 
 }
