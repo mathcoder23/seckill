@@ -11,7 +11,7 @@ import java.net.SocketTimeoutException;
 /**
  * @author wangxiaodong
  */
-public class SecKillRunnable implements Runnable{
+public class SecKillRunnable implements Runnable {
 
     private final Logger logger = LogManager.getLogger(SecKillService.class);
     /**
@@ -31,20 +31,46 @@ public class SecKillRunnable implements Runnable{
      */
     private long startDate;
 
-    public SecKillRunnable(boolean resetSt, HttpService httpService, Integer vaccineId, long startDate) {
+    /**
+     * 请求次数
+     */
+    private int reqCount;
+
+    /**
+     * 提前时间
+     */
+    private int earlyTime;
+
+    /**
+     * st刷新阀值
+     */
+    private int stRefreshTh;
+
+    public SecKillRunnable(boolean resetSt, HttpService httpService, Integer vaccineId, long startDate, int earlyTime, int stRefreshTh) {
         this.resetSt = resetSt;
         this.httpService = httpService;
         this.vaccineId = vaccineId;
         this.startDate = startDate;
+        this.earlyTime = earlyTime;
+        this.stRefreshTh = stRefreshTh;
+        this.reqCount = 0;
     }
 
     @Override
     public void run() {
         do {
+            if (System.currentTimeMillis() + earlyTime < startDate) {
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                continue;
+            }
             long id = Thread.currentThread().getId();
             try {
                 //获取加密参数st
-                if(resetSt){
+                if (resetSt || (stRefreshTh > 0 && (reqCount % stRefreshTh) == (stRefreshTh - 1))) {
                     logger.info("Thread ID：{}，请求获取加密参数st", id);
                     Config.st = httpService.getSt(vaccineId.toString());
                     logger.info("Thread ID：{}，成功获取加密参数st", id);
@@ -57,18 +83,24 @@ public class SecKillRunnable implements Runnable{
                 break;
             } catch (BusinessException e) {
                 logger.info("Thread ID: {}, 抢购失败: {}", id, e.getErrMsg());
-                if(e.getErrMsg().contains("没抢到")){
+                if (e.getErrMsg().contains("没抢到")) {
                     Config.success = false;
                     break;
                 }
-            } catch (ConnectTimeoutException | SocketTimeoutException socketTimeoutException ){
+            } catch (ConnectTimeoutException | SocketTimeoutException socketTimeoutException) {
                 logger.error("Thread ID: {},抢购失败: 超时了", Thread.currentThread().getId());
-            }catch (Exception e) {
+            } catch (Exception e) {
                 logger.warn("Thread ID: {}，未知异常", Thread.currentThread().getId());
-            }finally {
-                //如果离开始时间10分钟后，或者已经成功抢到则不再继续
-                if (System.currentTimeMillis() > startDate + 1000 * 60 *10 || Config.success != null) {
+            } finally {
+                reqCount++;
+                //如果离开始时间2分钟后，或者已经成功抢到则不再继续
+                if (System.currentTimeMillis() > startDate + 1000 * 60 * 2 || Config.success != null) {
                     break;
+                }
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
         } while (true);

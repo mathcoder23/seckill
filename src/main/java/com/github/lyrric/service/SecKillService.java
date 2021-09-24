@@ -44,38 +44,35 @@ public class SecKillService {
         long startDate = convertDateToInt(startDateStr);
 
         long now = System.currentTimeMillis();
-        if(now + 5000 < startDate){
+        if (now + 5000 < startDate) {
             logger.info("还未到获取st时间，等待中......");
             Thread.sleep(startDate - now - 5000);
         }
-        while (true){
+        while (true) {
             //提前五秒钟获取服务器时间戳接口，计算加密用
             try {
                 logger.info("Thread ID：main，请求获取加密参数st");
                 Config.st = httpService.getSt(vaccineId.toString());
                 logger.info("Thread ID：main，成功获取加密参数st：{}", Config.st);
                 break;
-            }catch (ConnectTimeoutException  | SocketTimeoutException socketTimeoutException ){
+            } catch (ConnectTimeoutException | SocketTimeoutException socketTimeoutException) {
                 logger.error("Thread ID：main,获取st失败: 超时");
-            }catch (BusinessException e){
+            } catch (BusinessException e) {
                 logger.error("Thread ID：main,获取st失败: {}", e.getMessage());
-            }catch (Exception e) {
+            } catch (Exception e) {
                 logger.error("Thread ID：main,获取st失败，大概率是约苗问题:{}", e.getMessage());
             }
         }
         now = System.currentTimeMillis();
-        if(now + 500 < startDate){
+        if (now + 1000 < startDate) {
             logger.info("获取st参数成功，还未到秒杀开始时间，等待中......");
-            Thread.sleep(startDate - now - 500);
+            Thread.sleep(startDate - now - 1000);
         }
-
-        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate));
-        Thread.sleep(200);
-        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate));
-        Thread.sleep(200);
-        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate));
-        Thread.sleep(200);
-        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate));
+        //保守型请求
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 0, 0));
+        service.submit(new SecKillRunnable(false, httpService, vaccineId, startDate, 10, 0));
+        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate, 200, 50));
+        service.submit(new SecKillRunnable(true, httpService, vaccineId, startDate, 500, 0));
         service.shutdown();
         //等待线程结束
         try {
@@ -91,20 +88,23 @@ public class SecKillService {
                 }
                 logger.info("抢购失败");
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
-        }finally {
+        } finally {
             if (mainFrame != null) {
                 mainFrame.setStartBtnEnable();
             }
         }
 
     }
+
     public List<VaccineList> getVaccines() throws IOException, BusinessException {
         return httpService.getVaccineList();
     }
+
     /**
-     *  将时间字符串转换为时间戳
+     * 将时间字符串转换为时间戳
+     *
      * @param dateStr yyyy-mm-dd格式
      * @return
      */
